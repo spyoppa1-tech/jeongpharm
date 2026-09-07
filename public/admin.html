@@ -9,45 +9,90 @@
 <body>
   <main style="max-width: 480px; margin: 40px auto; padding: 0 16px;">
     <h2 style="margin-bottom: 12px;">블로그 최신화</h2>
-    <p style="color: #666; font-size: 14px; margin-bottom: 16px;">
-      새 글을 지금 바로 반영합니다. 관리자 키가 필요합니다.
-    </p>
-    <form id="refresh-form" style="display: flex; gap: 8px;">
-      <input
-        id="admin-key"
-        type="password"
-        placeholder="관리자 키"
-        autocomplete="off"
-        class="search-input"
-        style="flex: 1;"
-      />
-      <button type="submit" class="search-button">최신화</button>
-    </form>
+
+    <div id="setup-view">
+      <p style="color: #666; font-size: 14px; margin-bottom: 16px;">
+        처음 한 번만 관리자 키를 입력하면, 이 브라우저에서는 다음부터 버튼만 누르면 됩니다.
+      </p>
+      <form id="setup-form" style="display: flex; gap: 8px;">
+        <input
+          id="admin-key"
+          type="password"
+          placeholder="관리자 키"
+          autocomplete="off"
+          class="search-input"
+          style="flex: 1;"
+        />
+        <button type="submit" class="search-button">저장</button>
+      </form>
+    </div>
+
+    <div id="button-view" style="display: none;">
+      <p style="color: #666; font-size: 14px; margin-bottom: 16px;">
+        새 글을 지금 바로 반영합니다.
+      </p>
+      <button id="refresh-button" class="search-button" style="width: 100%; padding: 14px;">
+        지금 최신화
+      </button>
+      <p style="margin-top: 12px;">
+        <a href="#" id="reset-link" style="font-size: 13px; color: #999;">저장된 키 지우기</a>
+      </p>
+    </div>
+
     <p id="result" style="margin-top: 16px; font-size: 14px; white-space: pre-wrap;"></p>
   </main>
 
   <script type="module">
-    const form = document.getElementById("refresh-form");
+    const setupView = document.getElementById("setup-view");
+    const buttonView = document.getElementById("button-view");
+    const setupForm = document.getElementById("setup-form");
     const keyInput = document.getElementById("admin-key");
+    const refreshButton = document.getElementById("refresh-button");
+    const resetLink = document.getElementById("reset-link");
     const resultEl = document.getElementById("result");
 
-    const savedKey = sessionStorage.getItem("adminKey");
-    if (savedKey) keyInput.value = savedKey;
+    function showButtonView() {
+      setupView.style.display = "none";
+      buttonView.style.display = "block";
+    }
 
-    form.addEventListener("submit", async (e) => {
+    function showSetupView() {
+      setupView.style.display = "block";
+      buttonView.style.display = "none";
+      keyInput.value = "";
+      resultEl.textContent = "";
+    }
+
+    if (localStorage.getItem("adminKey")) {
+      showButtonView();
+    }
+
+    setupForm.addEventListener("submit", (e) => {
       e.preventDefault();
       const key = keyInput.value.trim();
       if (!key) return;
-      sessionStorage.setItem("adminKey", key);
+      localStorage.setItem("adminKey", key);
+      showButtonView();
+    });
 
+    resetLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      localStorage.removeItem("adminKey");
+      showSetupView();
+    });
+
+    async function runRefresh() {
+      const key = localStorage.getItem("adminKey");
       resultEl.textContent = "최신화 중... (새 글이 있으면 시간이 걸릴 수 있습니다)";
       try {
         const res = await fetch(`/api/refresh?key=${encodeURIComponent(key)}`);
-        const data = await res.json();
         if (res.status === 401) {
-          resultEl.textContent = "관리자 키가 올바르지 않습니다.";
+          resultEl.textContent = "관리자 키가 올바르지 않습니다. 키를 다시 입력해주세요.";
+          localStorage.removeItem("adminKey");
+          showSetupView();
           return;
         }
+        const data = await res.json();
         if (data.error) {
           resultEl.textContent = `오류: ${data.error}`;
           return;
@@ -59,7 +104,9 @@
       } catch (err) {
         resultEl.textContent = `요청 실패: ${err.message}`;
       }
-    });
+    }
+
+    refreshButton.addEventListener("click", runRefresh);
   </script>
 </body>
 </html>
