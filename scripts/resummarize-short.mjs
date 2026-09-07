@@ -4,18 +4,16 @@ import { loadEnv } from "./lib/load-env.mjs";
 
 await loadEnv();
 
-const INPUT_PATH = path.join("data", "posts-detail.json");
-const OUTPUT_PATH = path.join("data", "posts-summarized.json");
+const INPUT_PATH = path.join("data", "posts-summarized.json");
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const DELAY_MS = Number(process.env.GEMINI_DELAY_MS) || 4200;
 const BODY_CHAR_LIMIT = 3000;
-const SUMMARY_MAX_LEN = 35;
+const ALREADY_SHORT_LEN = 40;
+const MAX_LEN = 35;
 
 const API_KEY = process.env.GEMINI_API_KEY;
 if (!API_KEY) {
-  console.error(
-    "GEMINI_API_KEY가 설정되어 있지 않습니다. .env 파일에 GEMINI_API_KEY=발급받은키 형태로 추가하세요."
-  );
+  console.error("GEMINI_API_KEY가 설정되어 있지 않습니다.");
   process.exit(1);
 }
 
@@ -41,6 +39,10 @@ function buildShortenPrompt(sentence) {
   return `다음 문장의 핵심 의미는 유지하면서 한국어 기준 35자 이내로 더 줄이세요. 반드시 주어와 서술어를 갖춘 완전한 문장이어야 하고 마침표(.)로 끝나야 합니다. 다른 설명 없이 줄인 문장만 출력하세요.\n\n문장: ${sentence}`;
 }
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 async function callGemini(text, retries = 3) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -62,63 +64,45 @@ async function callGemini(text, retries = 3) {
     }
     const data = await res.json();
     const text2 = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text2) {
-      throw new Error(`요약 결과 없음: ${JSON.stringify(data).slice(0, 300)}`);
-    }
+    if (!text2) throw new Error("요약 결과 없음");
     return text2.trim();
   }
 }
 
-async function summarizeOne(post) {
+async function summarizeShort(post) {
   let summary = await callGemini(buildPrompt(post));
   let pass = 1;
-  while (summary && summary.length > SUMMARY_MAX_LEN && pass < 3) {
-    await sleep(4200);
+  while (summary && summary.length > MAX_LEN && pass < 3) {
+    await sleep(DELAY_MS);
     summary = await callGemini(buildShortenPrompt(summary));
     pass++;
   }
   return summary;
 }
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 async function main() {
-  const fullPosts = JSON.parse(await readFile(INPUT_PATH, "utf-8"));
-  const limit = Number(process.env.LIMIT) || fullPosts.length;
-  const posts = fullPosts.slice(0, limit);
+  const posts = JSON.parse(await readFile(INPUT_PATH, "utf-8"));
+  const todo = posts.filter((p) => !p.summary || p.summary.length > ALREADY_SHORT_LEN);
 
-  let existing = [];
-  try {
-    existing = JSON.parse(await readFile(OUTPUT_PATH, "utf-8"));
-  } catch {
-    // 첫 실행이면 결과 파일이 없을 수 있음
-  }
-  const doneIds = new Set(existing.map((p) => p.postId));
-  const results = [...existing];
-
-  const todo = posts.filter((p) => !doneIds.has(p.postId));
-  console.log(`전체 ${posts.length}건 중 ${todo.length}건 요약 진행 (기존 완료 ${doneIds.size}건 스킵)`);
+  console.log(`전체 ${posts.length}건 중 ${todo.length}건 재요약 진행 (이미 짧은 요약 ${posts.length - todo.length}건 스킵)`);
 
   for (let i = 0; i < todo.length; i++) {
     const post = todo[i];
     try {
-      const summary = await summarizeOne(post);
-      results.push({ ...post, summary });
+      post.summary = await summarizeShort(post);
     } catch (err) {
       console.warn(`  실패 [${post.postId}] ${post.title}: ${err.message}`);
     }
 
     if ((i + 1) % 10 === 0 || i === todo.length - 1) {
-      await writeFile(OUTPUT_PATH, JSON.stringify(results, null, 2), "utf-8");
+      await writeFile(INPUT_PATH, JSON.stringify(posts, null, 2), "utf-8");
       console.log(`진행: ${i + 1}/${todo.length} (중간 저장 완료)`);
     }
     await sleep(DELAY_MS);
   }
 
-  await writeFile(OUTPUT_PATH, JSON.stringify(results, null, 2), "utf-8");
-  console.log(`완료: 총 ${results.length}건 → ${OUTPUT_PATH}`);
+  await writeFile(INPUT_PATH, JSON.stringify(posts, null, 2), "utf-8");
+  console.log(`완료`);
 }
 
 main().catch((err) => {

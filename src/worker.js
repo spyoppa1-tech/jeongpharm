@@ -105,12 +105,31 @@ function toMobileThumbnail(ogImage) {
   return ogImage.replace(/([?&])type=[^&]*/, "$1type=w300");
 }
 
+const SUMMARY_MAX_LEN = 35;
+
 function buildSummaryPrompt(entry, bodyText) {
   const body = bodyText.slice(0, BODY_CHAR_LIMIT);
-  return `다음은 약국 블로그 포스팅 본문입니다. 검색 결과 카드에 바로 넣을 수 있도록, 마크다운·제목·굵은글씨·목록 없이 순수 한글 문장 2~3개로만 핵심을 요약하세요. 광고성 문구나 인사말은 빼고 정보 위주로 작성하고, 다른 설명 없이 요약 문장만 출력하세요.\n\n제목: ${entry.title}\n\n본문:\n${body}`;
+  return `다음은 약국 블로그 포스팅의 본문입니다.
+
+이 포스팅의 핵심 내용을 한국어 기준 24~28자 사이의 완성된 문장 1개로 요약하세요.
+엄격한 규칙:
+- 반드시 28자를 넘기지 마세요 (공백 포함 글자 수 기준). 28자를 넘으면 실패로 간주합니다.
+- 짧더라도 주어와 서술어를 갖춘 완전한 문장이어야 하고 마침표(.)로 끝나야 합니다
+- 마크다운, 따옴표, 부가 설명, 글자수 표시 없이 요약 문장 하나만 출력하세요
+
+예시(26자): 임산부는 안전한 완하제를 복용해야 한다.
+
+제목: ${entry.title}
+
+본문:
+${body}`;
 }
 
-async function summarize(entry, bodyText, env, retries = 3) {
+function buildShortenPrompt(sentence) {
+  return `다음 문장의 핵심 의미는 유지하면서 한국어 기준 35자 이내로 더 줄이세요. 반드시 주어와 서술어를 갖춘 완전한 문장이어야 하고 마침표(.)로 끝나야 합니다. 다른 설명 없이 줄인 문장만 출력하세요.\n\n문장: ${sentence}`;
+}
+
+async function callGemini(text, env, retries = 3) {
   const model = env.GEMINI_MODEL || "gemini-3.5-flash-lite";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -118,7 +137,7 @@ async function summarize(entry, bodyText, env, retries = 3) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: buildSummaryPrompt(entry, bodyText) }] }],
+        contents: [{ parts: [{ text }] }],
         generationConfig: { maxOutputTokens: 2000 },
       }),
     });
@@ -128,10 +147,20 @@ async function summarize(entry, bodyText, env, retries = 3) {
     }
     if (!res.ok) throw new Error(`Gemini 요청 실패: HTTP ${res.status}`);
     const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("Gemini 응답에 요약 텍스트 없음");
-    return text.trim();
+    const text2 = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text2) throw new Error("Gemini 응답에 요약 텍스트 없음");
+    return text2.trim();
   }
+}
+
+async function summarize(entry, bodyText, env) {
+  let summary = await callGemini(buildSummaryPrompt(entry, bodyText), env);
+  let pass = 1;
+  while (summary && summary.length > SUMMARY_MAX_LEN && pass < 3) {
+    summary = await callGemini(buildShortenPrompt(summary), env);
+    pass++;
+  }
+  return summary;
 }
 
 async function runSync(env) {
