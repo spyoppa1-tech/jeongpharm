@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>정약국 블로그 검색</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <form id="search-form" class="search-form" role="search">
+      <input
+        id="search-input"
+        class="search-input"
+        type="search"
+        name="q"
+        placeholder="궁금한 키워드를 검색해보세요 (예: 크레아틴)"
+        autocomplete="off"
+      />
+      <button type="submit" class="search-button" aria-label="검색">검색</button>
+    </form>
+  </header>
+
+  <main>
+    <h2 id="results-heading" class="results-heading">최근 포스팅</h2>
+    <div id="results" class="card-grid" aria-live="polite"></div>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "healthdose-blog-search",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fetch-rss": "node scripts/fetch-rss.mjs"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0",
+    "fuse.js": "^7.5.0"
+  }
+}
