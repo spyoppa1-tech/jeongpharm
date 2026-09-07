@@ -19,7 +19,7 @@ async function main() {
     link: p.link,
     thumbnail: toMobileThumbnail(p.ogImage),
     summary: p.summary,
-    category: p.category,
+    category: p.categoryName ?? p.category,
     addDate: p.addDate,
     searchText: (p.bodyText || "").slice(0, SEARCH_TEXT_LIMIT),
   }));

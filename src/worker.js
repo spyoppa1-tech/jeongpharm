@@ -81,6 +81,10 @@ function extractBodyText(html) {
     .trim();
 }
 
+function extractCategoryName(html) {
+  return html.match(/categoryName = '([^']*)'/)?.[1] ?? null;
+}
+
 async function fetchPostDetail(postId) {
   const res = await fetch(buildPostViewUrl(postId), {
     headers: { "User-Agent": "Mozilla/5.0" },
@@ -90,6 +94,7 @@ async function fetchPostDetail(postId) {
   return {
     ogImage: extractMeta(html, "og:image"),
     bodyText: extractBodyText(html),
+    categoryName: extractCategoryName(html),
   };
 }
 
@@ -148,7 +153,7 @@ async function runSync(env) {
         link: entry.link,
         thumbnail: toMobileThumbnail(detail.ogImage),
         summary,
-        category: entry.category,
+        category: detail.categoryName ?? entry.category,
         addDate: entry.addDate,
         searchText: detail.bodyText.slice(0, SEARCH_TEXT_LIMIT),
       });

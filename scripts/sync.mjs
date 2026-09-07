@@ -107,6 +107,10 @@ function extractBodyText(html) {
     .trim();
 }
 
+function extractCategoryName(html) {
+  return html.match(/categoryName = '([^']*)'/)?.[1] ?? null;
+}
+
 async function fetchPostDetail(postId) {
   const res = await fetch(buildPostViewUrl(postId), {
     headers: { "User-Agent": "Mozilla/5.0" },
@@ -118,6 +122,7 @@ async function fetchPostDetail(postId) {
     ogImage: extractMeta(html, "og:image"),
     ogDescription: extractMeta(html, "og:description"),
     bodyText: extractBodyText(html),
+    categoryName: extractCategoryName(html),
   };
 }
 
