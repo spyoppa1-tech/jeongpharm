@@ -1,0 +1,15 @@
+name = "jeongpharm"
+main = "src/worker.js"
+compatibility_date = "2025-01-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/data/posts.json"]
+
+[[kv_namespaces]]
+binding = "POSTS_KV"
+id = "d04c6012905746da9c20e27d7634f23d"
+
+[triggers]
+crons = ["0 21 * * *"]
