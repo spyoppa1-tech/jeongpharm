@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관리자 - 최신화</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main style="max-width: 480px; margin: 40px auto; padding: 0 16px;">
+    <h2 style="margin-bottom: 12px;">블로그 최신화</h2>
+    <p style="color: #666; font-size: 14px; margin-bottom: 16px;">
+      새 글을 지금 바로 반영합니다. 관리자 키가 필요합니다.
+    </p>
+    <form id="refresh-form" style="display: flex; gap: 8px;">
+      <input
+        id="admin-key"
+        type="password"
+        placeholder="관리자 키"
+        autocomplete="off"
+        class="search-input"
+        style="flex: 1;"
+      />
+      <button type="submit" class="search-button">최신화</button>
+    </form>
+    <p id="result" style="margin-top: 16px; font-size: 14px; white-space: pre-wrap;"></p>
+  </main>
+
+  <script type="module">
+    const form = document.getElementById("refresh-form");
+    const keyInput = document.getElementById("admin-key");
+    const resultEl = document.getElementById("result");
+
+    const savedKey = sessionStorage.getItem("adminKey");
+    if (savedKey) keyInput.value = savedKey;
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const key = keyInput.value.trim();
+      if (!key) return;
+      sessionStorage.setItem("adminKey", key);
+
+      resultEl.textContent = "최신화 중... (새 글이 있으면 시간이 걸릴 수 있습니다)";
+      try {
+        const res = await fetch(`/api/refresh?key=${encodeURIComponent(key)}`);
+        const data = await res.json();
+        if (res.status === 401) {
+          resultEl.textContent = "관리자 키가 올바르지 않습니다.";
+          return;
+        }
+        if (data.error) {
+          resultEl.textContent = `오류: ${data.error}`;
+          return;
+        }
+        resultEl.textContent =
+          data.newCount === 0
+            ? "새 포스팅 없음. 이미 최신 상태입니다."
+            : `새 포스팅 ${data.newCount}건 반영 완료:\n${data.titles.join("\n")}`;
+      } catch (err) {
+        resultEl.textContent = `요청 실패: ${err.message}`;
+      }
+    });
+  </script>
+</body>
+</html>
