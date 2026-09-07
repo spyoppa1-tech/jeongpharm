@@ -8,6 +8,7 @@ const resultsEl = document.getElementById("results");
 const headingEl = document.getElementById("results-heading");
 const formEl = document.getElementById("search-form");
 const inputEl = document.getElementById("search-input");
+const popularEl = document.getElementById("popular-searches");
 
 function escapeHtml(str) {
   return str.replace(/[&<>"']/g, (c) => ({
@@ -28,6 +29,29 @@ function cardHtml(p) {
         <p class="post-summary">${escapeHtml(p.summary ?? "")}</p>
       </div>
     </a>`;
+}
+
+function logSearch(term) {
+  fetch("/api/log-search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ term }),
+  }).catch(() => {});
+}
+
+function renderPopularSearches(items) {
+  if (!items || items.length === 0) {
+    popularEl.innerHTML = "";
+    return;
+  }
+  popularEl.innerHTML =
+    `<span class="popular-label">인기 검색어</span>` +
+    items
+      .map(
+        (item, i) =>
+          `<button type="button" class="popular-term" data-term="${escapeHtml(item.term)}"><span class="rank">${i + 1}</span>${escapeHtml(item.term)}</button>`
+      )
+      .join("");
 }
 
 function debounce(fn, ms) {
@@ -81,11 +105,27 @@ async function main() {
 
   showRecent();
 
+  fetch("/api/top-searches")
+    .then((res) => res.json())
+    .then(renderPopularSearches)
+    .catch(() => {});
+
+  popularEl.addEventListener("click", (e) => {
+    const button = e.target.closest(".popular-term");
+    if (!button) return;
+    const term = button.dataset.term;
+    inputEl.value = term;
+    runSearch(term);
+    logSearch(term);
+  });
+
   const debouncedSearch = debounce(runSearch, DEBOUNCE_MS);
   inputEl.addEventListener("input", () => debouncedSearch(inputEl.value));
   formEl.addEventListener("submit", (e) => {
     e.preventDefault();
+    const trimmed = inputEl.value.trim();
     runSearch(inputEl.value);
+    if (trimmed) logSearch(trimmed);
   });
 }
 

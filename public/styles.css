@@ -47,6 +47,45 @@ body {
   outline-offset: 1px;
 }
 
+.popular-searches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  max-width: 720px;
+  margin: 8px auto 0;
+  padding: 0 2px;
+}
+
+.popular-label {
+  font-size: 13px;
+  color: #999;
+  flex-shrink: 0;
+}
+
+.popular-term {
+  font-size: 13px;
+  color: #444;
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  min-height: 32px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.popular-term:hover,
+.popular-term:active {
+  color: #2f6d3a;
+  text-decoration: underline;
+}
+
+.popular-term .rank {
+  font-weight: 700;
+  color: #2f6d3a;
+  margin-right: 2px;
+}
+
 .search-button {
   flex-shrink: 0;
   font-size: 16px;

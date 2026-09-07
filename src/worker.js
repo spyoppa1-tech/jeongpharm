@@ -2,6 +2,8 @@ const BLOG_ID = "spyoppa2";
 const COUNT_PER_PAGE = 30;
 const BODY_CHAR_LIMIT = 3000;
 const SEARCH_TEXT_LIMIT = 500;
+const SEARCH_TERM_MAX_LEN = 50;
+const TOP_SEARCH_LIMIT = 5;
 
 function buildArchiveUrl(page) {
   const params = new URLSearchParams({
@@ -178,9 +180,38 @@ async function runSync(env) {
   return { newCount: newEntries.length, titles: newEntries.map((e) => e.title) };
 }
 
+async function logSearchTerm(env, rawTerm) {
+  const term = (rawTerm ?? "").trim().slice(0, SEARCH_TERM_MAX_LEN);
+  if (!term) return;
+  const counts = (await env.POSTS_KV.get("searchCounts", "json")) ?? {};
+  counts[term] = (counts[term] ?? 0) + 1;
+  await env.POSTS_KV.put("searchCounts", JSON.stringify(counts));
+}
+
+async function getTopSearches(env) {
+  const counts = (await env.POSTS_KV.get("searchCounts", "json")) ?? {};
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, TOP_SEARCH_LIMIT)
+    .map(([term, count]) => ({ term, count }));
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/log-search" && request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      ctx.waitUntil(logSearchTerm(env, body.term));
+      return new Response(null, { status: 204 });
+    }
+
+    if (url.pathname === "/api/top-searches") {
+      const top = await getTopSearches(env);
+      return new Response(JSON.stringify(top), {
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    }
 
     if (url.pathname === "/data/posts.json") {
       const posts = await env.POSTS_KV.get("posts", "text");
