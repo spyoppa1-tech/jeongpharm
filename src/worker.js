@@ -4,6 +4,7 @@ const BODY_CHAR_LIMIT = 3000;
 const SEARCH_TEXT_LIMIT = 500;
 const SEARCH_TERM_MAX_LEN = 50;
 const TOP_SEARCH_LIMIT = 5;
+const SYNC_HISTORY_LIMIT = 10;
 
 function buildArchiveUrl(page) {
   const params = new URLSearchParams({
@@ -209,6 +210,35 @@ async function runSync(env) {
   return { newCount: newEntries.length, titles: newEntries.map((e) => e.title) };
 }
 
+async function recordSyncStatus(env, entry) {
+  const history = (await env.POSTS_KV.get("syncHistory", "json")) ?? [];
+  history.unshift({ runAt: new Date().toISOString(), ...entry });
+  await env.POSTS_KV.put("syncHistory", JSON.stringify(history.slice(0, SYNC_HISTORY_LIMIT)));
+}
+
+async function runSyncTracked(env, trigger) {
+  try {
+    const result = await runSync(env);
+    await recordSyncStatus(env, {
+      trigger,
+      success: true,
+      newCount: result.newCount,
+      titles: result.titles,
+      error: null,
+    });
+    return result;
+  } catch (err) {
+    await recordSyncStatus(env, {
+      trigger,
+      success: false,
+      newCount: 0,
+      titles: [],
+      error: String(err.message ?? err),
+    });
+    throw err;
+  }
+}
+
 async function logSearchTerm(env, rawTerm) {
   const term = (rawTerm ?? "").trim().slice(0, SEARCH_TERM_MAX_LEN);
   if (!term) return;
@@ -258,7 +288,7 @@ export default {
         return new Response("Unauthorized", { status: 401 });
       }
       try {
-        const result = await runSync(env);
+        const result = await runSyncTracked(env, "manual");
         return new Response(JSON.stringify(result), {
           headers: { "content-type": "application/json; charset=utf-8" },
         });
@@ -270,10 +300,17 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/sync-status") {
+      const history = (await env.POSTS_KV.get("syncHistory", "json")) ?? [];
+      return new Response(JSON.stringify(history), {
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    }
+
     return env.ASSETS.fetch(request);
   },
 
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runSync(env));
+    ctx.waitUntil(runSyncTracked(env, "cron"));
   },
 };

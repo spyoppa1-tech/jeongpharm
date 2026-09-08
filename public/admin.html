@@ -40,6 +40,11 @@
     </div>
 
     <p id="result" style="margin-top: 16px; font-size: 14px; white-space: pre-wrap;"></p>
+
+    <div style="margin-top: 32px; border-top: 1px solid #e5e5e0; padding-top: 16px;">
+      <h3 style="font-size: 15px; margin-bottom: 8px;">동기화 상태</h3>
+      <div id="sync-status" style="font-size: 13px; color: #555;">불러오는 중...</div>
+    </div>
   </main>
 
   <script type="module">
@@ -50,6 +55,48 @@
     const refreshButton = document.getElementById("refresh-button");
     const resetLink = document.getElementById("reset-link");
     const resultEl = document.getElementById("result");
+    const syncStatusEl = document.getElementById("sync-status");
+
+    function formatTime(iso) {
+      return new Date(iso).toLocaleString("ko-KR", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    function triggerLabel(trigger) {
+      return trigger === "cron" ? "자동" : "수동";
+    }
+
+    async function loadSyncStatus() {
+      try {
+        const res = await fetch("/api/sync-status");
+        const history = await res.json();
+        if (!history || history.length === 0) {
+          syncStatusEl.textContent = "아직 실행 기록이 없습니다.";
+          return;
+        }
+        syncStatusEl.innerHTML = history
+          .map((h) => {
+            const time = formatTime(h.runAt);
+            const label = triggerLabel(h.trigger);
+            if (!h.success) {
+              return `<div style="margin-bottom: 6px;">${time} (${label}) — ❌ 실패: ${h.error}</div>`;
+            }
+            const detail = h.newCount === 0 ? "신규 글 없음" : `신규 ${h.newCount}건`;
+            return `<div style="margin-bottom: 6px;">${time} (${label}) — ✅ 성공, ${detail}</div>`;
+          })
+          .join("");
+      } catch (err) {
+        syncStatusEl.textContent = `상태를 불러오지 못했습니다: ${err.message}`;
+      }
+    }
+
+    loadSyncStatus();
 
     function showButtonView() {
       setupView.style.display = "none";
@@ -103,6 +150,8 @@
             : `새 포스팅 ${data.newCount}건 반영 완료:\n${data.titles.join("\n")}`;
       } catch (err) {
         resultEl.textContent = `요청 실패: ${err.message}`;
+      } finally {
+        loadSyncStatus();
       }
     }
 
