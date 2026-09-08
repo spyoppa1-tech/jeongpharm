@@ -37,7 +37,7 @@ body {
   display: flex;
   gap: 8px;
   max-width: 720px;
-  margin: 10px auto 3px;
+  margin: 30px auto 3px;
 }
 
 .search-input {
