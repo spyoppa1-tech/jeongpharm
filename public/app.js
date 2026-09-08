@@ -62,9 +62,29 @@ function debounce(fn, ms) {
   };
 }
 
+function buildSynonymExpander(synonymGroups) {
+  return function expandQuery(term) {
+    const expanded = new Set([term]);
+    for (const group of synonymGroups) {
+      const matchedInGroup = group.some(
+        (g) => term.includes(g) || g.includes(term)
+      );
+      if (matchedInGroup) {
+        for (const g of group) expanded.add(g);
+      }
+    }
+    return [...expanded];
+  };
+}
+
 async function main() {
-  const res = await fetch("./data/posts.json");
-  const posts = await res.json();
+  const [postsRes, synonymsRes] = await Promise.all([
+    fetch("./data/posts.json"),
+    fetch("./data/synonyms.json"),
+  ]);
+  const posts = await postsRes.json();
+  const synonymGroups = await synonymsRes.json().catch(() => []);
+  const expandQuery = buildSynonymExpander(synonymGroups);
 
   const fuse = new Fuse(posts, {
     keys: [
@@ -82,6 +102,23 @@ async function main() {
     resultsEl.innerHTML = posts.slice(0, RECENT_COUNT).map(cardHtml).join("");
   }
 
+  function searchWithSynonyms(query) {
+    const terms = expandQuery(query);
+    const bestByPostId = new Map();
+    for (const term of terms) {
+      for (const r of fuse.search(term, { limit: MAX_RESULTS })) {
+        const existing = bestByPostId.get(r.item.postId);
+        if (!existing || r.score < existing.score) {
+          bestByPostId.set(r.item.postId, r);
+        }
+      }
+    }
+    return [...bestByPostId.values()]
+      .sort((a, b) => a.score - b.score)
+      .slice(0, MAX_RESULTS)
+      .map((r) => r.item);
+  }
+
   function runSearch(query) {
     const trimmed = query.trim();
     if (trimmed === "") {
@@ -89,7 +126,7 @@ async function main() {
       return;
     }
 
-    const matches = fuse.search(trimmed, { limit: MAX_RESULTS }).map((r) => r.item);
+    const matches = searchWithSynonyms(trimmed);
 
     if (matches.length === 0) {
       headingEl.textContent = `"${trimmed}" 검색 결과 없음`;
