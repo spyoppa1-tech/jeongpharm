@@ -20,9 +20,38 @@
       <button type="submit" class="search-button" aria-label="검색">검색</button>
     </form>
     <div id="popular-searches" class="popular-searches"></div>
+    <div class="contact-links">
+      <a
+        class="contact-link kakao"
+        href="https://pf.kakao.com/_rXuxixl"
+        target="_blank"
+        rel="noopener"
+      >
+        <svg class="contact-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M12 3C6.48 3 2 6.58 2 11c0 2.86 1.9 5.37 4.75 6.78-.15.55-.96 3.4-.99 3.6 0 0-.02.16.09.22.1.06.23.01.23.01.31-.04 3.55-2.32 4.1-2.71.6.09 1.21.13 1.82.13 5.52 0 10-3.58 10-8s-4.48-8-10-8z"
+          />
+        </svg>
+        <span>카카오톡 상담</span>
+      </a>
+      <a
+        class="contact-link naver"
+        href="https://talk.naver.com/ct/w479og"
+        target="_blank"
+        rel="noopener"
+      >
+        <svg class="contact-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M12 3C6.48 3 2 6.58 2 11c0 2.86 1.9 5.37 4.75 6.78-.15.55-.96 3.4-.99 3.6 0 0-.02.16.09.22.1.06.23.01.23.01.31-.04 3.55-2.32 4.1-2.71.6.09 1.21.13 1.82.13 5.52 0 10-3.58 10-8s-4.48-8-10-8z"
+          />
+        </svg>
+        <span>네이버 톡톡</span>
+      </a>
+    </div>
   </header>
 
   <main>
+    <div id="ai-answer" class="ai-answer" hidden></div>
     <h2 id="results-heading" class="results-heading">최근 포스팅</h2>
     <div id="results" class="card-grid" aria-live="polite"></div>
   </main>
